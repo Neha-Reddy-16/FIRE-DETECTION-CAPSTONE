@@ -1,79 +1,126 @@
-# FireSense-AI
+# Multi-Modal Fire Detection System using EfficientNetV2, TCN and Meta-Learning with IoT Sensors
 
-FireSense-AI is a multi-modal fire detection system that combines computer vision and sensor-based temporal analysis using Raspberry Pi and ESP32. The system integrates image-based predictions with real-time sensor data to provide reliable fire detection.
+This project presents a multi-modal fire detection system that combines image-based deep learning with IoT sensor-based temporal analysis. The system is designed to improve reliability by using both visual information and environmental sensor data instead of relying on a single source.
+
+The implementation uses EfficientNetV2 for image classification, a Temporal Convolution Network (TCN) for modeling sensor sequences, and a meta-learning approach to combine both outputs into a final prediction.
 
 ---
 
 ## Overview
 
-This project uses a fusion approach:
+The system is built around a Raspberry Pi and ESP32 setup. A USB camera connected to the Raspberry Pi captures images, while an ESP32 collects real-time data from multiple sensors. Both streams are processed independently and then fused to produce the final fire or safe prediction.
 
-* Image-based detection using EfficientNetV2
-* Sensor-based temporal modeling using TCN (Temporal Convolution Network)
-* Final decision using a meta-model
-
-The system reads live sensor data from ESP32 and camera input from Raspberry Pi, processes both streams, and outputs a fire or safe prediction.
+This approach makes the system more robust in real-world scenarios where lighting conditions, smoke visibility, or sensor noise alone may not be sufficient for reliable detection.
 
 ---
 
-## Hardware Requirements
+## IoT Integration
 
-* Raspberry Pi (64-bit OS recommended)
-* ESP32 microcontroller
-* USB camera compatible with Raspberry Pi
-* Sensors:
+The IoT component plays a key role in this system by providing continuous environmental data.
 
-  * MQ2 Gas Sensor
-  * MQ135 Air Quality Sensor
-  * Temperature Sensor
-  * Flame Sensor
-  * Ultrasonic Sensor
-* USB cable for ESP32 connection
-* Jumper wires and breadboard
+An ESP32 microcontroller is used to collect sensor readings and send them to the main system. The following sensors are used:
 
----
+* MQ2 Gas Sensor
+* MQ135 Air Quality Sensor
+* Temperature Sensor
+* Flame Sensor
+* Ultrasonic Sensor
 
-## Hardware Setup
+The ESP32 reads these sensor values in real time and transmits them via serial communication to the Raspberry Pi. The data is collected as a sequence over time and passed to the TCN model.
 
-1. Connect all sensors to the ESP32:
-
-   * MQ2
-   * MQ135
-   * Temperature sensor
-   * Flame sensor
-   * Ultrasonic sensor
-
-2. Update pin configurations in the ESP32 code according to your wiring.
-
-3. Upload the ESP32 code:
-
-   * Navigate to the `esp32/` folder
-   * Upload the `.ino` file using Arduino IDE or PlatformIO
-
-4. Connect ESP32 to Raspberry Pi via USB.
-
-5. Connect the USB camera to Raspberry Pi.
+Since the sensor model depends on temporal patterns, the system waits until a sufficient number of readings (sequence length) is collected before making predictions. This initial delay is expected behavior.
 
 ---
 
-## Project Setup
+## Model Components
 
-1. Clone the repository:
+### EfficientNetV2 (Image Model)
 
-```bash
-git clone https://github.com/Shreesh-125/FireSense-AI.git
-cd FireSense-AI
+EfficientNetV2-S is used for classifying images into fire or safe categories.
+
+* AUC on test set is approximately 0.9999
+* Very strong separation between fire and non-fire samples
+* Some false positives occur due to threshold selection
+
+This model is highly effective in ranking samples correctly, even though threshold tuning is required for optimal classification.
+
+---
+
+### TCN (Sensor Model)
+
+The Temporal Convolution Network processes sequences of sensor readings.
+
+* AUC on test set is around 0.88
+* Captures temporal trends in environmental data
+* Useful for detecting conditions not clearly visible in images
+
+This model complements the vision model by providing additional context.
+
+---
+
+### Fusion Models
+
+Two fusion approaches are used to combine predictions:
+
+#### OR Fusion (Hard Fusion)
+
+Takes the maximum of probabilities from both models.
+
+* Improves fire detection recall
+* Can increase false positives
+
+#### Meta Fusion (Soft Fusion)
+
+A meta-model is trained using outputs from both models.
+
+* AUC close to 1.0
+* Produces more stable and reliable predictions
+* Reduces inconsistencies between models
+
+This is the final model used for decision making.
+
+---
+
+## Key Observations from Results
+
+* EfficientNetV2 provides near-perfect ranking performance
+* TCN improves detection by capturing temporal sensor behavior
+* Fusion significantly improves robustness
+* High AUC does not imply perfect classification; threshold selection is important
+
+---
+
+## Dataset
+
+The dataset is organized into multiple folders such as:
+
+* merged1_test
+* merged2_test
+* ...
+* merged20_test
+
+Each folder contains image sequences used for evaluation under different conditions.
+
+---
+
+## Project Structure
+
+```text
+FIRE-DETECTION-CAPSTONE/
+│
+├── merged*_test/        # Dataset folders
+├── esp32/              # ESP32 related files
+├── esp_code.ino        # Sensor data acquisition code
+├── infer.py            # Inference pipeline
+├── requirements.txt    # Dependencies
+├── README.md
 ```
 
 ---
 
-## Models
+## Model Files
 
-The trained model files are not included in this repository due to size constraints.
-
-You can generate the models using the training scripts provided in the project(Will be uploaded if not).
-
-Ensure that the following files are generated and placed inside same directory as infer.py before running:
+The trained models include:
 
 * effnetv2s_model.keras
 * tcn_model.keras
@@ -81,38 +128,28 @@ Ensure that the following files are generated and placed inside same directory a
 * scaler_tcn.pkl
 * meta.pkl
 
----
-
-## Dataset
-
-A small sample dataset is included in the repository under the `dataset/` folder.
-
-* This sample is provided only for demonstration and testing purposes.
-* It is not sufficient to train the model.
-* You should use your own dataset or extend the dataset for proper training.
-
----
-
-## Virtual Environment Setup
-
-Create and activate a virtual environment:
-
-```bash
-python3 -m venv venv
-source venv/bin/activate
-```
-
-Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
+These are stored in the repository using Git LFS due to size constraints.
 
 ---
 
 ## Running the System
 
-```bash
+1. Clone the repository:
+
+```text
+git clone https://github.com/Neha-Reddy-16/FIRE-DETECTION-CAPSTONE.git
+cd FIRE-DETECTION-CAPSTONE
+```
+
+2. Install dependencies:
+
+```text
+pip install -r requirements.txt
+```
+
+3. Run inference:
+
+```text
 python infer.py
 ```
 
@@ -120,43 +157,18 @@ python infer.py
 
 ## Important Notes
 
-* Ensure ESP32 is connected and detected (e.g., `/dev/ttyUSB0`)
+* The system requires a sequence of sensor readings before producing output
+* Initial delay is expected until sufficient data is collected
+* Ensure ESP32 is connected and detected (e.g., /dev/ttyUSB0)
 * Ensure camera is properly connected
-* Ensure all model files are present in the `models/` folder
 
 ---
 
-## Initial Behavior
+## Conclusion
 
-The system requires an initial sequence of sensor data before making predictions.
+This project demonstrates that combining computer vision with IoT-based sensor data leads to a more reliable fire detection system.
 
-* It collects approximately `SEQ_LEN` (e.g., 30) data points
-* During this phase, no fire/safe output will be shown
-* This is expected behavior
-
-Once sufficient data is collected, predictions will begin.
-
----
-
-## Output
-
-The system prints:
-
-* SAFE → No fire detected
-* FIRE ALERT → Fire detected
-
----
-
-## Project Structure
-
-```
-FireSense-AI/
-├── infer.py
-├── requirements.txt
-├── README.md
-├── esp32/
-├── dataset/        (sample data only)
-```
+The image model provides strong visual detection, while the sensor model captures environmental changes over time. The meta-learning approach effectively combines both, making the system suitable for real-world deployment.
 
 ---
 
@@ -167,5 +179,6 @@ FireSense-AI/
 * OpenCV
 * scikit-learn
 * ESP32 (Arduino)
+* Raspberry Pi
 
 ---
